@@ -212,12 +212,12 @@ def regularized_richard_lucy_deconv(img, psf, smooth_coeff, iters):
     for _ in range(iters):
         c = psf@pixel_arr_itr
         c[c == 0] = 1
-        grad = np.gradient(pixel_arr_itr.reshape(img.shape))
-        divergence = np.gradient(grad[0], axis=0) + np.gradient(grad[1], axis=1)
+        grad = np.array(np.gradient(pixel_arr_itr.reshape(img.shape)))
+        norms = np.sum(np.abs(grad),axis=0)
+        norms[norms == 0] = 1
+        grad /=norms
+        divergence = np.gradient(grad[0],axis=0) + np.gradient(grad[1], axis=1)
         divergence_arr = divergence.reshape(-1)
-        divergence_arr /= np.sum(np.abs(divergence_arr))
         sm = psf.T@(pixel_arr/c)
-        temp_1 = pixel_arr_itr*sm
-        temp_2 = (1 - smooth_coeff*divergence_arr)
-        pixel_arr_itr = temp_1/temp_2
+        pixel_arr_itr = pixel_arr_itr*sm/(1 - smooth_coeff*divergence_arr) 
     return pixel_arr_itr.reshape(img.shape)
