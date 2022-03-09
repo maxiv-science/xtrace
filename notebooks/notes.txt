@@ -1,0 +1,5 @@
+'/data/visitors/balder/20220115/2022022408/raw/XRD Eiger Test'
+
+old:
+#'/data/staff/common/data/pd'
+#'LaB6_ref_carmen_data_000001.h5'

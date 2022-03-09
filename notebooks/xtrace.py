@@ -33,12 +33,10 @@ def cramers_rule(a,b):
 
 
 def sensor_depth_spill_psf(params, hit_row, hit_col):
-    #do_plot = False # set false for 1M rays
-    startTime = time.time()
     
-    hit_x = 0 #for all points
+    hit_x = 0
     hit_y = reshape(hit_col * params["pl"], (hit_col.size, 1, 1))
-    hit_z = reshape(hit_row * params["ph"], (hit_col.size, 1, 1)) 
+    hit_z = reshape(hit_row * params["ph"], (hit_row.size, 1, 1)) 
     
     hit_ids = np.arange(hit_col.size)
     
@@ -189,17 +187,7 @@ def sensor_depth_spill_psf(params, hit_row, hit_col):
     row_idx = row_idx[:,:,2] * params["det_numpixels"][1] + row_idx[:,:,1] # 2d-index to flatten index
     row_idx = row_idx[lidx]
 
-    # get resut to cpu (seems not work always)
-    #print(dist[2,0])
-    #print(result_b[0,:,:])
-
     sl=slice(0,6)
-    #print(col_idx[sl])
-    #print(row_idx[sl])
-    #print(ai[sl])
-
-    executionTime = (time.time() - startTime)
-    #print('nhits:', nhits, ', exec. time (sec):', executionTime)
     
     dim = params["det_numpixels"]
     N = dim[0]*dim[1]
@@ -220,4 +208,14 @@ def regularized_richard_lucy_deconv(img, psf, smooth_coeff, iters):
         divergence_arr = divergence.reshape(-1)
         sm = psf.T@(pixel_arr/c)
         pixel_arr_itr = pixel_arr_itr*sm/(1 - smooth_coeff*divergence_arr) 
+    return pixel_arr_itr.reshape(img.shape)
+
+def richard_lucy_deconv(img, psf, iters):
+    pixel_arr = np.array(img).reshape(-1)
+    pixel_arr_itr = pixel_arr.copy()
+    for _ in range(iters):
+        c = psf@pixel_arr_itr
+        c[c == 0] = 1
+        sm = psf.T@(pixel_arr/c)
+        pixel_arr_itr = pixel_arr_itr*sm
     return pixel_arr_itr.reshape(img.shape)
