@@ -97,9 +97,8 @@ def plot_compare_images(img1, img2, area=(slice(550,650), slice(100, 200)), titl
     #plt.figure(figsize=(20, 20))
     #plt.imshow(img2, vmax=perc)
 
-
-
-def azimutal_integration(img, mask, poni_dict, icsdfilepath, pixel_dimensions):
+    
+def azimutal_fit(img, poni_dict, icsdfilepath, pixel_dimensions):
     pl, pw, ph = pixel_dimensions
     # ## Azimuthal Integration
     # Comparison between raw and reconstructed
@@ -151,13 +150,23 @@ def azimutal_integration(img, mask, poni_dict, icsdfilepath, pixel_dimensions):
     }
 
     xtth = np.linspace(0.0, 36*deg2rad, int(36./0.01)+1) # dxtth=0.02 deg
+    deg_xtth = xtth*rad2deg
+    
+    return deg_xtth, tth_hkl, det_params_b711
+
+def azimutal_integration(img, mask, deg_xtth, tth_hkl, det_params_b711):
+    deg2rad = np.pi/180.
+    rad2deg = 180./np.pi
+    xtth = deg_xtth*deg2rad
     tthFnc_tilt = mp.tth2DwithTilt
     tthFnc = mp.tth2Dsimple
 
-    _idx_split, _wgt_split = mp.ttheq_get_indexes_withPixelSplitting(xtth, delta=0.0,
-                                                detParams=det_params_b711,
-                                                N=[],M=[],
-                                                tthFnc=tthFnc)
+    _idx_split, _wgt_split = mp.ttheq_get_indexes_withPixelSplitting(
+        xtth, delta=0.0,
+        detParams=det_params_b711,
+        N=[],M=[],
+        tthFnc=tthFnc
+    )
 
     _nbvpix = np.sum((_wgt_split>0).astype('uint32'))
 
@@ -182,9 +191,7 @@ def azimutal_integration(img, mask, poni_dict, icsdfilepath, pixel_dimensions):
     inorm_bc[lidx] = idata_bc[lidx]/ndata_bc[lidx]
     az_img = inorm_bc
     
-    deg_xtth = xtth*rad2deg
-    
-    return az_img, det_params_b711, deg_xtth, tth_hkl
+    return az_img
 
 def plot_fit(img, poni_dict, det_params_b711, tth_hkl, pixel_dimensions):
     pl, pw, ph = pixel_dimensions

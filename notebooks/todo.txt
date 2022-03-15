@@ -1,2 +1,2 @@
-- break up azimutal integration (in correction.py) into two parts, config and image comp.
+- clean up correction.py
 - filter away areas larger than 100.000 (really high peaks)
