@@ -19,12 +19,17 @@ from cupy import meshgrid, linspace
 import numpy as np
 import cupy as cp
 import xtrace
+import skimage.morphology as morph
 
-def mask(data):
+def mask(data, removehotspots=False):
     #Removing raw parts of image: 
     #-1 -> detector gaps, -2 -> hot pixels + extreme values
     mask = np.logical_or(data==np.uint32(-1),data==np.uint32(-2))
-    img = data.copy()
+    img = data.copy()  
+    if removehotspots:
+        peaks = img > 100_000
+        peaks = morph.binary_dilation(peaks)
+        mask = np.logical_or(mask, peaks)
     img[mask] = 0
     mask = ~mask
     return img, mask
@@ -116,6 +121,7 @@ def azimutal_fit(img, poni_dict, icsdfilepath, pixel_dimensions):
     lidx = arg<=1. # some reflections may be unreachable for our wavelength
     d_hkl = d_hkl[lidx]
     arg = arg[lidx]
+    
     tth_hkl = 2.*np.arcsin(poni_dict['Wavelength']*1e10/2./d_hkl)
     # we actually see 6 LaB6 lines and so we take only them
     # note: some lines still may be there multiple times (in case they overlap)
@@ -128,16 +134,19 @@ def azimutal_fit(img, poni_dict, icsdfilepath, pixel_dimensions):
 
     deg2rad = np.pi/180.
     rad2deg = 180./np.pi
-
-    ai = AzimuthalIntegrator() # new integrator
-    ai.setPyFAI(pixel1=ph*1e-6, pixel2=pl*1e-6,
-                dist=poni_dict['Distance'],
-                poni1=poni_dict['Poni1'], poni2=poni_dict['Poni2'],
-                rot1=poni_dict['Rot1'], rot2=poni_dict['Rot2'], rot3=poni_dict['Rot3'],
-                splineFile=None)
+    ai = AzimuthalIntegrator(
+        pixel1=ph*1e-6, 
+        pixel2=pl*1e-6,
+        dist=poni_dict['Distance'],
+        poni1=poni_dict['Poni1'], poni2=poni_dict['Poni2'],
+        rot1=poni_dict['Rot1'], rot2=poni_dict['Rot2'], rot3=poni_dict['Rot3'],
+        wavelength=poni_dict['Wavelength']
+    )
 
     # convert detector parameters from Carmen's (pyFAI-like) notation to bli711 (Fit2D-like) notation
     pf2d = ai.getFit2D()
+    
+    #help(mp)
     det_params_b711 = {
         'n0': pf2d['centerY'],
         'm0': pf2d['centerX'],
@@ -148,50 +157,7 @@ def azimutal_fit(img, poni_dict, icsdfilepath, pixel_dimensions):
         'rot': pf2d['tiltPlanRotation']*deg2rad ,
         'tilt': pf2d['tilt']*deg2rad
     }
-
-    xtth = np.linspace(0.0, 36*deg2rad, int(36./0.01)+1) # dxtth=0.02 deg
-    deg_xtth = xtth*rad2deg
-    
-    return deg_xtth, tth_hkl, det_params_b711
-
-def azimutal_integration(img, mask, deg_xtth, tth_hkl, det_params_b711):
-    deg2rad = np.pi/180.
-    rad2deg = 180./np.pi
-    xtth = deg_xtth*deg2rad
-    tthFnc_tilt = mp.tth2DwithTilt
-    tthFnc = mp.tth2Dsimple
-
-    _idx_split, _wgt_split = mp.ttheq_get_indexes_withPixelSplitting(
-        xtth, delta=0.0,
-        detParams=det_params_b711,
-        N=[],M=[],
-        tthFnc=tthFnc
-    )
-
-    _nbvpix = np.sum((_wgt_split>0).astype('uint32'))
-
-    # for compatibility with FPGA
-    fptp = np.dtype(np.float32)
-    _idx_split = _idx_split.astype(np.int16)
-    _wgt_split = _wgt_split.astype(fptp)
-
-    idata_bc = np.zeros(xtth.shape, dtype=fptp)
-    ndata_bc = np.zeros(xtth.shape, dtype=fptp)
-    for k in range(_idx_split.shape[-1]):
-       # reduce data
-       _lidx  = _wgt_split[:,:,k]>0.
-       _ridx  = _idx_split[_lidx,k]
-       _rimg  = img[_lidx]*_wgt_split[_lidx,k]
-       _rmask = mask[_lidx]*_wgt_split[_lidx,k]
-       # integrate data
-       idata_bc += np.bincount(_ridx,weights=_rimg,minlength=len(xtth))
-       ndata_bc += np.bincount(_ridx,weights=_rmask,minlength=len(xtth))
-    inorm_bc = np.full_like(xtth,np.nan)
-    lidx = ndata_bc>0
-    inorm_bc[lidx] = idata_bc[lidx]/ndata_bc[lidx]
-    az_img = inorm_bc
-    
-    return az_img
+    return ai, det_params_b711, tth_hkl
 
 def plot_fit(img, poni_dict, det_params_b711, tth_hkl, pixel_dimensions):
     pl, pw, ph = pixel_dimensions
@@ -207,7 +173,7 @@ def plot_fit(img, poni_dict, det_params_b711, tth_hkl, pixel_dimensions):
     # note: there is no function 2theta to pixel coords in maxpy_erda as it was not needed for integration
 
     N,M = np.meshgrid(np.linspace(0, det_params_b711['n'], 200), np.linspace(0, det_params_b711['m'], 200))
-    tth = mp.tth2Dsimple(0.0,N,M,det_params_b711)
+    tth = mp.tth2DwithTilt(0.0,N,M,det_params_b711)
 
     dtth = 0.1 * deg2rad
     for line in tth_hkl:
@@ -218,8 +184,8 @@ def plot_fit(img, poni_dict, det_params_b711, tth_hkl, pixel_dimensions):
 
 
 def plot_compare_peaks(az_before, az_after, deg_xtth, tth_hkl): #add options
-    peak_width = 1
-    peaks = { str(n):(v*57.4 - peak_width/2, v*57.4 + peak_width/2)
+    peak_width = 2
+    peaks = { str(n):(v*60 - peak_width/2, v*60 + peak_width/2)
              for n, v in enumerate(tth_hkl) if n <= 5}
     peak_slices = {name:np.logical_and(b1 < deg_xtth, deg_xtth < b2) 
                    for name, (b1, b2) in peaks.items()}
@@ -239,8 +205,8 @@ def plot_compare_peaks(az_before, az_after, deg_xtth, tth_hkl): #add options
 
 
 def plot_compare_peak_fit(az_before, az_after, deg_xtth, tth_hkl): #add options
-    peak_width = 1
-    peaks = { str(n):(v*57.4 - peak_width/2, v*57.4 + peak_width/2)
+    peak_width = 2
+    peaks = { str(n):(v*60 - peak_width/2, v*60 + peak_width/2)
              for n, v in enumerate(tth_hkl) if n <= 5}
     peak_slices = {name:np.logical_and(b1 < deg_xtth, deg_xtth < b2) 
                    for name, (b1, b2) in peaks.items()}
