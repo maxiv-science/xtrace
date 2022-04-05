@@ -1,0 +1,15 @@
+Instructions for calibration using pyFAI:
+
+Download ThinLinc client and connect to "offline-fe1" or "clu0-gn-0" (need to be connected to white network, either directly or via VPN)
+
+Open terminal and navigate to collected data:
+    $ cd /data/visitors/balder/20220115/2022022408
+    
+The folder raw contains .h5 files with images
+
+To run pyFAI, load relevant module:
+    $ module add foss/2020b pyFAI
+    
+And open:
+    $ pyFAI-calib2
+    
