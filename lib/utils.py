@@ -87,6 +87,17 @@ def ray_grid(dimensions, samp_density=1):
     hit_col = hit_col.flatten()
     return hit_row, hit_col
 
+def random_ray_grid(dimensions):
+    hit_row, hit_col = meshgrid(
+        linspace(1/2, dimensions[0] - 1/2, dimensions[0]),
+        linspace(1/2, dimensions[1] - 1/2, dimensions[1])
+    )
+    hit_row = hit_row.flatten()
+    hit_col = hit_col.flatten()
+    hit_row += cp.random.random(hit_row.shape) - 0.5
+    hit_col += cp.random.random(hit_col.shape) - 0.5
+    return hit_row, hit_col
+
 #redo these
 def local_transform(config, img, area):
     px, py, pz = config["detector"]["pixel_dims"]
