@@ -20,12 +20,16 @@ import numpy as np
 import cupy as cp
 import xtrace
 import skimage.morphology as morph
+import cupyx.scipy.sparse as cusp
+import time
+from scipy.ndimage import zoom
+from scipy.signal import convolve2d
 
 def mask(data, removehotspots=False):
     #Removing raw parts of image: 
     #-1 -> detector gaps, -2 -> hot pixels + extreme values
     mask = np.logical_or(data==np.uint32(-1),data==np.uint32(-2))
-    img = data.copy()  
+    img = data.copy()
     if removehotspots:
         peaks = img > 100_000
         peaks = morph.binary_dilation(peaks)
@@ -48,20 +52,20 @@ def load_poni(filepath):
                         pass#print(f"didn't parse {l}")
             return poni_dict
 
-def correct_depth_spill(img, poni_dict, pixel_dimensions): #add parameters
-    #Hit points
-    samp = 1
-    hit_col, hit_row = meshgrid(
-        linspace(0, img.shape[0], round(samp*img.shape[0])),
-        linspace(0, img.shape[1], round(samp*img.shape[1]))
+def correct_depth_spill(img, poni_dict, pixel_dimensions, samp=1):
+    eps = 1/samp/2
+    hit_row, hit_col = meshgrid(
+        linspace(eps, img.shape[0] - eps, samp*img.shape[0]),
+        linspace(eps, img.shape[1] - eps, samp*img.shape[1])
     )
     hit_row = hit_row.flatten()
     hit_col = hit_col.flatten()
 
     pl, pw, ph = pixel_dimensions
+    #padding = 0
+    #img = np.pad(img, [(padding, ), (padding, )], mode='constant')
     config = {
         "mu": 3.445930 * 10**-3, #in 1/micron
-        "IO": 1,
         #Pixel dimentions
         "pl": pl,
         "pw": pw,
@@ -69,21 +73,38 @@ def correct_depth_spill(img, poni_dict, pixel_dimensions): #add parameters
         #Detector dimentions
         "det_numpixels": img.shape,
         #detector limits in Cartesian coordinates
-        "det_xlim": (0.0, pw),
-        "det_ylim": (0.0, img.shape[1] * pl),
-        "det_zlim": (0.0, img.shape[0] * ph),
         #Cartesian coordinates of the sample, given by the poni file 
         "sx": -poni_dict['Distance']*1e6,
-        "sy": poni_dict['Poni2']*1e6,
-        "sz": poni_dict['Poni1']*1e6,
-        #Positive or negative integer number related to the plane point
-        "Jj": 10,
-        "wavelength": poni_dict['Wavelength']*1e10
+        "sy": poni_dict['Poni2']*1e6, #- padding*pl,
+        "sz": poni_dict['Poni1']*1e6, #- padding*ph,
     }
-    G = xtrace.sensor_depth_spill_psf(config, hit_row, hit_col)
-    recovered_img = xtrace.regularized_richard_lucy_deconv(img, G, 0.02, 100).get()
-    return recovered_img
+    G = xtrace.depth_spill_psf(config, hit_row, hit_col)
+    recovered_img = xtrace.regularized_richard_lucy_deconv(img, G, 0.000, 10).get()
+    #recovered_img = recovered_img[padding:-padding,padding:-padding]
+    #recovered_img = xtrace.landweber_deconvolution(img, G, 0.05, 10)
+    return recovered_img, G
 
+def correct_depth_spill_local(img, area, poni_dict, pixel_dimensions, samp=1):
+    pl, pw, ph = pixel_dimensions
+    ylim, xlim = area
+    xdiff = pl*xlim.start
+    ydiff = ph*ylim.start
+    img_area = img[area]
+    temp_dict = poni_dict.copy()
+    temp_dict['Poni1'] -= xdiff*1e-6
+    temp_dict['Poni2'] -= ydiff*1e-6
+    return correct_depth_spill(img_area, temp_dict, pixel_dimensions, samp)
+
+def correct_depth_spill_upsampled(img, poni_dict, pixel_dimensions, samp=1, z=2, order=0):
+    u_img = zoom(img, z, order=order)
+    pl, pw, ph = pixel_dimensions
+    pixel_dimensions_new = pl/z, pw, ph/z
+    temp_dict = poni_dict.copy()
+    recovered_img, G = correct_depth_spill(u_img, temp_dict, pixel_dimensions_new, samp)
+    kernel = np.ones((z, z))/z/z
+    convolved = convolve2d(recovered_img, kernel, mode='valid')
+    return convolved[::z, ::z], G
+    
 def plot_compare_images(img1, img2, area=(slice(550,650), slice(100, 200)), title1="First", title2="Second"):
     perc = np.percentile(img1, 99.8)
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))

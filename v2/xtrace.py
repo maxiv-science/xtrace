@@ -27,12 +27,16 @@ from functools import reduce
 #             d |
 #               |
 #               v
+#               @
 #           RAY ORIGIN
 #
 #
 
+def get_config(poni, detector_info):
+    return {
+        
+    }
 def depth_spill_psf(params, xp, yp, G=None):
-    nx, ny = params["det_numpixels"]
     px = params["pl"]
     py = params["ph"]
     pz = params["pw"]
@@ -40,6 +44,7 @@ def depth_spill_psf(params, xp, yp, G=None):
     sy = params["sy"]
     d = -params["sx"]
     mu = params["mu"]
+    nx, ny = params["det_numpixels"]
     
     raycount = len(xp)
     npix = nx*ny
@@ -63,7 +68,7 @@ def depth_spill_psf(params, xp, yp, G=None):
     
     current_cells = original_cells.copy()
     energies = np.ones(raycount)*npix/raycount
-    last_dists = np.zeros(raycount)
+    last_dists = np.ones(raycount)
     
     while True:
         keep = ~np.logical_or(np.logical_or(
