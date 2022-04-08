@@ -1,6 +1,3 @@
-#from numpy import array, linspace, meshgrid, reshape, concatenate, around
-#from numpy import zeros, vstack, tile, inner, floor, linalg, where, shape
-#import numpy as np
 from cupy import array, linspace, meshgrid, reshape, concatenate, around
 from cupy import zeros, vstack, tile, inner, floor, linalg, where, shape
 import cupy as np
@@ -100,3 +97,32 @@ def depth_spill_psf(config, xp, yp, energies=None, G=None):
         current_cells[closest_ind] += plane_dirs[closest_ind]
     
     return G
+
+def depth_offsets(config, xp, yp):
+    nx, ny = config["dimensions"]
+    sx, sy, d = config["ray_origin"]
+    px, py, pz = config["detector"]["pixel_dims"]
+    mu = config["detector"]["mu"]
+    
+    raycount = len(xp)
+    npix = nx*ny
+    
+    origin = np.array([sx, sy])[:,np.newaxis]
+    pixel_dims = np.array([px, py])[:,np.newaxis]
+    bounds = np.array([nx, ny])[:,np.newaxis]
+    
+    hitpoints_pspace = np.stack((xp, yp))
+    hitpoints = hitpoints_pspace*pixel_dims
+    
+    original_cells = np.floor(hitpoints_pspace).astype(int)
+    rays = hitpoints - origin
+    offsets = rays/d*pz
+    
+    offsets /= npix/raycount
+    
+    xoffsets = np.zeros((nx, ny))
+    xoffsets[original_cells[0],original_cells[1]] += offsets[0]
+    yoffsets = np.zeros((nx, ny))
+    yoffsets[original_cells[0],original_cells[1]] += offsets[1]
+    
+    return xoffsets.get(), yoffsets.get()
