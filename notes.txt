@@ -7,4 +7,4 @@
 Observations for paper:
 -The image artifacts appear when using uniform grid for training a model!!!!! (ie is not the fault of
 
-#current problem: no random subpixel placement, makes model learn pixels
+# current problem: no random subpixel placement, makes model learn pixels

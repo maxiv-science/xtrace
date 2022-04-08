@@ -1,9 +1,3 @@
-# coding: utf-8
-
-# # Removing Effect of Sensor Depth Spill
-# This code is meant to illustrate the current state of trying to remove the effect of sensor depth spill. 
-# Authors: Zdenek Matej and Samuel Selleck
-
 import os, json
 import numpy as np
 import h5py
@@ -88,12 +82,7 @@ def ray_grid(dimensions, samp_density=1):
     return hit_row, hit_col
 
 def random_ray_grid(dimensions):
-    hit_row, hit_col = meshgrid(
-        linspace(1/2, dimensions[0] - 1/2, dimensions[0]),
-        linspace(1/2, dimensions[1] - 1/2, dimensions[1])
-    )
-    hit_row = hit_row.flatten()
-    hit_col = hit_col.flatten()
+    hit_row, hit_col = ray_grid(dimensions)
     hit_row += cp.random.random(hit_row.shape) - 0.5
     hit_col += cp.random.random(hit_col.shape) - 0.5
     return hit_row, hit_col
@@ -122,6 +111,10 @@ def downsample_img(img, z=2):
     convolved = convolve2d(img, kernel, mode='valid')
     return convolved[::z,::z]
 
+#Use this like this (pyFAI library)
+#integrator = utils.azimutal_integrator(config)
+#integrated_img = integrator.integrate2d(img, az_npt, az_npt, radial_range=radial)[0]
+#integrated_recovered = integrator.integrate2d(recovered_img, az_npt, az_npt, radial_range=radial)[0]
 def azimutal_integrator(config):
     px, py, _ = config["detector"]["pixel_dims"]
     poni1, poni2, dist = config["ray_origin"]*1e-6

@@ -29,15 +29,29 @@ global_config = {
     'ray_rotations': np.array([0., 0., 0.])
 }
 G_glob = xtrace.depth_spill_psf(global_config, *utils.ray_grid(global_config["dimensions"]))
-                                
-# config = {
-# "detector": {
-#         "pixel_dims": np.array([1.0, 1.0, 6.0]),
-#         "mu":  0.3
-#     },
-# "dimensions": np.array(dimensions),
-# "ray_origin": np.array([dimensions[0]/3, dimensions[1]/3, dimensions[1]/3]),
-# }
+      
+    
+class SyntheticDepthBlur(keras.utils.Sequence):
+
+    #could include options to configure config params (or there ranges)
+    def __init__(self, batch_size, batches, img_shape):
+        self.batch_size = batch_size
+        self.img_shape = img_shape
+        self.batches = batches
+
+    def __len__(self):
+        return self.batches
+
+    def __getitem__(self, idx):
+        
+        data = np.array([
+            get_synthetic_data_pair()
+            for i in range(self.batch_size)
+        ])
+        distorted_imgs = data[:,0, :, :, np.newaxis]
+        images = data[:,1, :, :, np.newaxis]
+        return (distorted_imgs, images)
+
 
 def get_synthetic_data_pair(config=None, randgrid=True):
     if config is None:
@@ -55,10 +69,10 @@ def apply_blur(img, G, noise):
         distorted_img += 0.00004*(rng.random()*0.5 + 1)*rng.poisson(100,img.shape)/100
     return distorted_img
 
-def random_image(dimensions, density=0.01):
+def random_image(dimensions, density=0.08):
     img = np.zeros(dimensions)
     hits = rng.random(dimensions) <= density*rng.random()
-    img[hits] = 0.001*rng.zipf(1.7, size=np.count_nonzero(hits))
+    img[hits] = rng.exponential( size=np.count_nonzero(hits))#0.001*rng.zipf(1.7, size=np.count_nonzero(hits))
     s = 15
     c = np.floor(s/2)
     def eval(x, y):
