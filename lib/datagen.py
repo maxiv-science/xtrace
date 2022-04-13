@@ -52,6 +52,34 @@ class SyntheticDepthBlur(keras.utils.Sequence):
         images = data[:,1, :, :, np.newaxis]
         return (distorted_imgs, images)
 
+class SyntheticDepthBlurPositional(keras.utils.Sequence):
+
+    #could include options to configure config params (or there ranges)
+    def __init__(self, batch_size, batches, img_shape, start_spread):
+        self.batch_size = batch_size
+        self.img_shape = img_shape
+        self.batches = batches
+        self.spread_mod = start_spread
+
+    def on_epoch_end(self):
+        if self.spread_mod < 1:
+            self.spread_mod += 0.01
+        
+    def __len__(self):
+        return self.batches
+
+    def __getitem__(self, idx):
+        
+        train, truth = list(zip(*[
+            get_synthetic_data_pair_positional(spread=self.spread_mod, randgrid=True)
+            for i in range(self.batch_size)
+        ]))
+        distorted_imgs = np.transpose(np.array(train, dtype=object), (0, 2, 3, 1)).astype('float32') 
+        images = np.stack(truth)[:,:,:, np.newaxis].astype('float32') 
+        #print(distorted_imgs.shape)
+        #print(images.shape)
+        return (distorted_imgs, images)
+
 
 def get_synthetic_data_pair(config=None, randgrid=True):
     if config is None:
@@ -63,16 +91,40 @@ def get_synthetic_data_pair(config=None, randgrid=True):
     distorted_img = apply_blur(img, G_glob, noise=True)
     return (distorted_img, img)
 
+def get_synthetic_data_pair_positional(config=None, randgrid=False, randconfig=True, spread=1.0):
+    if config is None:
+        config = global_config
+    if randconfig:
+        config = random_config(config["dimensions"], spread=spread)
+    ray_gen_func = utils.random_ray_grid if randgrid else utils.ray_grid
+    ray_grid = ray_gen_func(config["dimensions"])
+    G = xtrace.depth_spill_psf(config, *ray_grid)
+    img = random_image(config["dimensions"])
+    distorted_img = apply_blur(img, G, noise=True)
+    xdiff, ydiff = xtrace.depth_offsets(config, *ray_grid)
+    observed = np.stack((distorted_img, xdiff, ydiff))
+    return (observed, img)
+
 def apply_blur(img, G, noise):
     distorted_img = (G.get()@img.flatten()).reshape(img.shape)
     if noise:
-        distorted_img += 0.00004*(rng.random()*0.5 + 1)*rng.poisson(100,img.shape)/100
+        distorted_img += 0.00008*(rng.random()*0.5 + 1)*rng.poisson(100,img.shape)/100
     return distorted_img
 
-def random_image(dimensions, density=0.08):
-    img = np.zeros(dimensions)
+
+def _get_hitnoise(dimensions, density):
+    hits = rng.random(dimensions) <= density
+    noise = np.zeros(dimensions)
+    noise[hits] = rng.exponential(0.01, size=np.count_nonzero(hits))
+    hits = rng.random(dimensions) <= density*0.1
+    noise[hits] = rng.exponential(0.7,size=np.count_nonzero(hits))
+    return noise
+    
+def random_image(dimensions, density=0.02):
+    
+    #single_hits = randomly hitting rays
     hits = rng.random(dimensions) <= density*rng.random()
-    img[hits] = rng.exponential( size=np.count_nonzero(hits))#0.001*rng.zipf(1.7, size=np.count_nonzero(hits))
+    single_hits = _get_hitnoise(dimensions, density*rng.random())
     s = 15
     c = np.floor(s/2)
     def eval(x, y):
@@ -83,8 +135,36 @@ def random_image(dimensions, density=0.08):
     kernel = np.fromfunction(eval,(s, s))
     kernel -= kernel.min()
     kernel /= kernel.max()
-    img = convolve2d(img, kernel, mode='same')
-    return img
+    single_hits = convolve2d(single_hits, kernel, mode='same')
+    
+    #Gaussian hits = randomly hitting gaussians (made of multiple rays)
+    gaussian_hits = _get_hitnoise(dimensions, density*rng.random())
+    s = 15
+    kernel = makeGaussian(s, 1 + rng.random())
+    kernel -= kernel.min()
+    kernel /= kernel.max()
+    gaussian_hits = convolve2d(gaussian_hits, kernel, mode='same')
+    
+    return single_hits + gaussian_hits
+
+#Source: https://gist.github.com/andrewgiessel/4635563
+def makeGaussian(size, fwhm = 3, center=None):
+    """ Make a square gaussian kernel.
+    size is the length of a side of the square
+    fwhm is full-width-half-maximum, which
+    can be thought of as an effective radius.
+    """
+
+    x = np.arange(0, size, 1, float)
+    y = x[:,np.newaxis]
+    
+    if center is None:
+        x0 = y0 = size // 2
+    else:
+        x0 = center[0]
+        y0 = center[1]
+    
+    return np.exp(-4*np.log(2) * ((x-x0)**2 + (y-y0)**2) / fwhm**2)
 
 def random_depth_blur_psf(dimensions, randgrid=True):
     dim = np.max(dimensions) 
@@ -107,3 +187,18 @@ def random_depth_blur_psf(dimensions, randgrid=True):
         ray_grid = utils.ray_grid(dimensions)
     G = xtrace.depth_spill_psf(config, *ray_grid)
     return G
+
+def random_config(dimensions, spread=1.0):
+    dim = np.max(dimensions) 
+    return { #RANDOM CONFIG
+    "detector": {
+            "pixel_dims": np.array([1.0, 1.0, 6]), #randomize this?
+            "mu":  0.3
+        },
+    "dimensions": np.array(dimensions),
+    "ray_origin": np.array([
+            spread*dim*rng.normal() + dimensions[0]/2,
+            spread*dim*rng.normal() + + dimensions[1]/2,
+            5*dim - spread*4*dim*rng.random()
+        ]),
+    }

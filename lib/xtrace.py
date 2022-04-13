@@ -112,10 +112,8 @@ def depth_offsets(config, xp, yp):
     bounds = np.array([nx, ny])[:,np.newaxis]
     
     hitpoints_pspace = np.stack((xp, yp))
-    hitpoints = hitpoints_pspace*pixel_dims
-    
     original_cells = np.floor(hitpoints_pspace).astype(int)
-    rays = hitpoints - origin
+    rays = hitpoints_pspace - origin/pixel_dims
     offsets = rays/d*pz
     
     offsets /= npix/raycount
