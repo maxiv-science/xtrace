@@ -4,6 +4,11 @@ from keras.layers import Input, concatenate, Conv2D, Conv2DTranspose, MaxPooling
 from keras import backend as keras_backend
 from keras.layers import BatchNormalization
 
+import tensorflow as tf
+
+
+from tensorflow import keras
+
 #Credit: https://arxiv.org/abs/1810.00986
 
 class modelsClass(object):
@@ -45,56 +50,47 @@ class modelsClass(object):
         conv1 = Conv2D(64, (3, 3), activation='relu', padding='same')(inputs)
         conv1 = Conv2D(64, (3, 3), activation='relu', padding='same')(conv1)
         pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
-        batch1 = BatchNormalization()(pool1)
-        
-        conv2 = Conv2D(128, (3, 3), activation='relu', padding='same')(batch1)
+
+        conv2 = Conv2D(128, (3, 3), activation='relu', padding='same')(pool1)
         conv2 = Conv2D(128, (3, 3), activation='relu', padding='same')(conv2)
         pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
-        batch2 = BatchNormalization()(pool2)
-        
-        conv3 = Conv2D(256, (3, 3), activation='relu', padding='same')(batch2)
+
+        conv3 = Conv2D(256, (3, 3), activation='relu', padding='same')(pool2)
         conv3 = Conv2D(256, (3, 3), activation='relu', padding='same')(conv3)
         pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
-        batch3 = BatchNormalization()(pool3)
-        
-        conv4 = Conv2D(512, (3, 3), activation='relu', padding='same')(batch3)
+
+        conv4 = Conv2D(512, (3, 3), activation='relu', padding='same')(pool3)
         conv4 = Conv2D(512, (3, 3), activation='relu', padding='same')(conv4)
         pool4 = MaxPooling2D(pool_size=(2, 2))(conv4)
-        batch4 = BatchNormalization()(pool4)
-        
-        conv5 = Conv2D(1024, (3, 3), activation='relu', padding='same')(batch4)
+
+        conv5 = Conv2D(1024, (3, 3), activation='relu', padding='same')(pool4)
         conv5 = Conv2D(1024, (3, 3), activation='relu', padding='same')(conv5)
-        batch5 = BatchNormalization()(conv5)
         
-        up6 = Conv2DTranspose(512, (2, 2), strides=(2, 2), padding='same')(batch5)
+        up6 = Conv2DTranspose(512, (2, 2), strides=(2, 2), padding='same')(conv5)
         up6 = self.addPadding(up6,level=4)
         up6 = concatenate([up6,conv4], axis=3)
         conv6 = Conv2D(512, (3, 3), activation='relu', padding='same')(up6)
         conv6 = Conv2D(512, (3, 3), activation='relu', padding='same')(conv6)
-        batch6 = BatchNormalization()(conv6)
-        
-        up7 = Conv2DTranspose(256, (2, 2), strides=(2, 2), padding='same')(batch6)
+
+        up7 = Conv2DTranspose(256, (2, 2), strides=(2, 2), padding='same')(conv6)
         up7 = self.addPadding(up7,level=3)
         up7 = concatenate([up7,conv3], axis=3)
         conv7 = Conv2D(256, (3, 3), activation='relu', padding='same')(up7)
         conv7 = Conv2D(256, (3, 3), activation='relu', padding='same')(conv7)
-        batch7 = BatchNormalization()(conv7)
-        
-        up8 = Conv2DTranspose(128, (2, 2), strides=(2, 2), padding='same')(batch7)
+
+        up8 = Conv2DTranspose(128, (2, 2), strides=(2, 2), padding='same')(conv7)
         up8 = self.addPadding(up8,level=2)
         up8 = concatenate([up8,conv2], axis=3)
         conv8 = Conv2D(128, (3, 3), activation='relu', padding='same')(up8)
         conv8 = Conv2D(128, (3, 3), activation='relu', padding='same')(conv8)
-        batch8 = BatchNormalization()(conv8)
-        
-        up9 = Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same')(batch8)
+
+        up9 = Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same')(conv8)
         up9 = self.addPadding(up9,level=1)
         up9 = concatenate([up9,conv1], axis=3)
         conv9 = Conv2D(64, (3, 3), activation='relu', padding='same')(up9)
         conv9 = Conv2D(64, (3, 3), activation='relu', padding='same')(conv9)
-        batch9 = BatchNormalization()(conv9)
-        
-        conv10 = Conv2D(1, (1, 1), activation='linear')(batch9)
+
+        conv10 = Conv2D(1, (1, 1), activation='linear')(conv9)
         
         model = Model(inputs=inputs, outputs=conv10)
 
@@ -153,3 +149,41 @@ class modelsClass(object):
         model = Model(inputs=input_blurred, outputs=conv10)
 
         return model
+    
+def get_supres_model(upscale_factor=3, channels=1):
+    conv_args = {
+        "activation": "relu",
+        "kernel_initializer": "Orthogonal",
+        "padding": "same",
+    }
+    inputs = keras.Input(shape=(None, None, channels))
+    x = layers.Conv2D(64, 5, **conv_args)(inputs)
+    x = layers.Conv2D(64, 3, **conv_args)(x)
+    x = layers.Conv2D(64, 3, **conv_args)(x)
+    x = layers.Conv2D(32, 3, **conv_args)(x)
+    x = layers.Concatenate()([x, inputs])
+    x = layers.Conv2D(channels * (upscale_factor ** 2), 3, **conv_args)(x)
+    outputs = tf.nn.depth_to_space(x, upscale_factor)
+
+    return keras.Model(inputs, outputs)
+
+def get_supres_model_deep(upscale_factor=3, channels=1):
+    conv_args = {
+        "activation": "relu",
+        "kernel_initializer": "Orthogonal",
+        "padding": "same",
+    }
+    inputs = keras.Input(shape=(None, None, channels))
+    x = layers.Conv2D(128, 5, **conv_args)(inputs)
+    x = layers.Conv2D(128, 3, **conv_args)(x)
+    s1 = layers.Conv2D(64, 3, **conv_args)(x)
+    
+    x = layers.Conv2D(64, 3, **conv_args)(s1)
+    x = layers.Conv2D(64, 3, **conv_args)(x)
+    s2 = layers.Conv2D(64, 3, **conv_args)(x)
+    x = layers.Concatenate()([inputs, s1, s2])
+    
+    x = layers.Conv2D(channels * (upscale_factor ** 2), 3, **conv_args)(x)
+    outputs = tf.nn.depth_to_space(x, upscale_factor)
+
+    return keras.Model(inputs, outputs)

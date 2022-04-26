@@ -15,7 +15,7 @@ import tensorflow as tf
 from tensorflow import keras
 import numpy as np
 
-from scipy.signal import convolve2d
+from scipy.signal import fftconvolve
 
 
 global_config = {
@@ -71,7 +71,7 @@ class SyntheticDepthBlurPositional(keras.utils.Sequence):
     def __getitem__(self, idx):
         
         train, truth = list(zip(*[
-            get_synthetic_data_pair_positional(spread=self.spread_mod, randgrid=True)
+            get_synthetic_data_pair_positional(spread=self.spread_mod)
             for i in range(self.batch_size)
         ]))
         distorted_imgs = np.transpose(np.array(train, dtype=object), (0, 2, 3, 1)).astype('float32') 
@@ -81,6 +81,26 @@ class SyntheticDepthBlurPositional(keras.utils.Sequence):
         return (distorted_imgs, images)
 
 
+class SuperRes(keras.utils.Sequence):
+
+    def __init__(self, batch_size, batches, img_shape, factor=4):
+        self.batch_size = batch_size
+        self.img_shape = img_shape
+        self.batches = batches
+        self.factor = factor
+        config, _ = utils.upsample_transform(global_config, np.zeros((1, 1)), z=4)
+        self.G = xtrace.depth_spill_psf(config, *utils.ray_grid(config["dimensions"]))
+    def __len__(self):
+        return self.batches
+
+    def __getitem__(self, idx):
+        
+        images = [apply_blur(random_image(self.img_shape, 0.05, sc=4), self.G, True) for i in range(self.batch_size)]
+        downsampled = [utils.downsample_img(img, 4) for img in images]
+        images = np.array(images)[:,:,:,np.newaxis]
+        downsampled = np.array(downsampled)[:,:,:, np.newaxis]
+        return (downsampled, images)
+    
 def get_synthetic_data_pair(config=None, randgrid=True):
     if config is None:
         config = global_config
@@ -106,46 +126,53 @@ def get_synthetic_data_pair_positional(config=None, randgrid=False, randconfig=T
     return (observed, img)
 
 def apply_blur(img, G, noise):
-    distorted_img = (G.get()@img.flatten()).reshape(img.shape)
-    if noise:
-        distorted_img += 0.00008*(rng.random()*0.5 + 1)*rng.poisson(100,img.shape)/100
-    return distorted_img
+    return (G.get()@img.flatten()).reshape(img.shape)
 
+def apply_noise(img):
+    img += 0.00008*rng.random()*rng.poisson(100,img.shape)/100
+    return img
 
 def _get_hitnoise(dimensions, density):
     hits = rng.random(dimensions) <= density
     noise = np.zeros(dimensions)
     noise[hits] = rng.exponential(0.01, size=np.count_nonzero(hits))
-    hits = rng.random(dimensions) <= density*0.1
+    hits = rng.random(dimensions) <= density*0.1*rng.random()
     noise[hits] = rng.exponential(0.7,size=np.count_nonzero(hits))
     return noise
     
-def random_image(dimensions, density=0.02):
+def random_image(dimensions, density=0.02, sc=1):
     
+    t_density = density/(sc*sc)
     #single_hits = randomly hitting rays
-    hits = rng.random(dimensions) <= density*rng.random()
-    single_hits = _get_hitnoise(dimensions, density*rng.random())
-    s = 15
+    single_hits = _get_hitnoise(dimensions, t_density*rng.random())
+    
+    s = 14*sc + 1
     c = np.floor(s/2)
     def eval(x, y):
-        r_d_sq = ((x - c)**2 + (y - c)**2)*(20*(rng.random() + 0.5))**2
+        r_d_sq = ((x - c)**2 + (y - c)**2)*(40*(rng.random() + 0.2))**2/sc
         r_d_sq[r_d_sq == 0] = 0.1
         res = 1/r_d_sq
         return res
     kernel = np.fromfunction(eval,(s, s))
     kernel -= kernel.min()
     kernel /= kernel.max()
-    single_hits = convolve2d(single_hits, kernel, mode='same')
+    
+    single_hits = fftconvolve(single_hits, kernel, mode='same')
     
     #Gaussian hits = randomly hitting gaussians (made of multiple rays)
-    gaussian_hits = _get_hitnoise(dimensions, density*rng.random())
-    s = 15
-    kernel = makeGaussian(s, 1 + rng.random())
+    gaussian_hits = _get_hitnoise(dimensions, t_density*rng.random()*0.1)
+    s = 14*sc + 1
+    kernel = makeGaussian(s, (0.1 + 1.5*rng.random())*sc)
     kernel -= kernel.min()
     kernel /= kernel.max()
-    gaussian_hits = convolve2d(gaussian_hits, kernel, mode='same')
+    gaussian_hits = fftconvolve(gaussian_hits, kernel, mode='same')
     
-    return single_hits + gaussian_hits
+    return single_hits + gaussian_hits #+ noise_image(dimensions, density*0.2, sc)
+
+def noise_image(dimensions, density=0.02, sc=1):
+    img = 0.00008 + 3*rng.random(dimensions)
+    img[rng.random(dimensions) > density/(sc*sc)] = 0
+    return img
 
 #Source: https://gist.github.com/andrewgiessel/4635563
 def makeGaussian(size, fwhm = 3, center=None):
