@@ -9,7 +9,7 @@ synthetic data.
 - install tensorflow, numpy, cupy, matplotlib, scipy, pyFAI, h5py, hdf5plugin
 - for evaluation of networks, they need to be placed in a folder "trained networks".
 
-# Project Strucutre
+# Project Structure
 
 - **lib** - common code throughout the project
   - **xtrace.py** - estimation of spatially variant point spread function (and depth field estimates)
@@ -33,7 +33,7 @@ synthetic data.
   - **learning_syperres.ipynb** - training of superres network
 - **old_notebook_experiments** - collection of old code/past experiments, warning very messy
 
-# Machine Learning Models
+# ML Models
 
 - **static** - network trained to deconvolve an image always affected by the same point spread in each location.
 - **gyro** - repurposed network originally performing deconvolution of blurred images with added gyro information, gyro layers now replaced by depth field estimates to allow the network to learn deconvolution with different point spreads.
