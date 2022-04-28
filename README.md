@@ -6,8 +6,9 @@ synthetic data.
 
 # Setup
 
-- install tensorflow, numpy, cupy, matplotlib, scipy, pyFAI, h5py, hdf5plugin
-- for evaluation of networks, they need to be placed in a folder "trained networks".
+- Install tensorflow, numpy, cupy, matplotlib, scipy, pyFAI, h5py, hdf5plugin
+- For evaluation of networks, they need to be placed in a folder "trained networks".
+- Trained models (if you are a MAX IV employee) are in: /data/staff/common/data/pd/xtrace
 
 # Project Structure
 

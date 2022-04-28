@@ -22,3 +22,6 @@ Move trained networks to shared location (where?)
 
 
 https://keras.io/examples/vision/super_resolution_sub_pixel/
+
+
+Notes on

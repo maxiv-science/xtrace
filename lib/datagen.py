@@ -108,7 +108,7 @@ def get_synthetic_data_pair(config=None, randgrid=True):
     #ay_grid = ray_gen_func(config["dimensions"])
     #G = xtrace.depth_spill_psf(config, *ray_grid)
     img = random_image(config["dimensions"])
-    distorted_img = apply_blur(img, G_glob, noise=True)
+    distorted_img = apply_noise(apply_blur(img, G_glob, noise=True))
     return (distorted_img, img)
 
 def get_synthetic_data_pair_positional(config=None, randgrid=False, randconfig=True, spread=1.0):
@@ -120,7 +120,7 @@ def get_synthetic_data_pair_positional(config=None, randgrid=False, randconfig=T
     ray_grid = ray_gen_func(config["dimensions"])
     G = xtrace.depth_spill_psf(config, *ray_grid)
     img = random_image(config["dimensions"])
-    distorted_img = apply_blur(img, G, noise=True)
+    distorted_img = apply_noise(apply_blur(img, G, noise=True))
     xdiff, ydiff = xtrace.depth_offsets(config, *ray_grid)
     observed = np.stack((distorted_img, xdiff, ydiff))
     return (observed, img)
