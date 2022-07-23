@@ -1,0 +1,27 @@
+
+
+# Questions about images
+- Is the noise level always proportional to total energy?
+- Is the detector always hit in a single pixel with some bleed?
+
+Observations for paper:
+-The image artifacts appear when using uniform grid for training a model!!!!! (ie is not the fault of
+
+# current problem: no random subpixel placement, makes model learn pixels
+
+
+
+TODO:
+Compare difference for simulated PSF spread!
+-Create superresolution solution (using virtual hits)
+
+
+optimize data generation (especially for gyroadapted, super slow atm)
+generate entire image bach at the same time?
+Move trained networks to shared location (where?)
+
+
+https://keras.io/examples/vision/super_resolution_sub_pixel/
+
+
+Notes on
