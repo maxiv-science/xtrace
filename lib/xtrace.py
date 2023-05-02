@@ -126,22 +126,23 @@ def depth_offsets(config, xp, yp): #MAYBE I HAVE TO CHANGE THIS AS WELL :)
     return xoffsets.get(), yoffsets.get()
 
 def gaps_psf(config):
-    def gapMatrix(nvp, npm, nvpg):
+    def gapMatrix(nvp, npm, el_corr, nvpg):
         M = np.identity(nvp)
-        #identification of indexes
+        #identification of indexes that correspond to the firt el corr pixel in a gap
         index = np.arange(npm, nvp, npm + nvpg) 
-        #set the content of those indexes to 0.5
+        #set the content of those indexes to the electric correlation matrix
         for i in index:
-            M[i: i + nvpg, i: i + nvpg] = 0.5
+            M[i: i + nvpg, i: i + nvpg] = cupy.asarray(el_corr)
         return M
          
     nvp_0 = config["detector"]["nvirpix"][0]
     npm_0 = config["detector"]["npixmod"][0]
-    nvpg = config["detector"]["nvirpixgap"]
-    H = gapMatrix(nvp_0, npm_0, nvpg)
+    el_corr = config["detector"]["el_corr"]
+    nvpg = np.shape(el_corr)[0]
+    H = gapMatrix(nvp_0, npm_0, el_corr, nvpg)
     
     nvp_1 = config["detector"]["nvirpix"][1]
     npm_1 = config["detector"]["npixmod"][1]
-    V = gapMatrix(nvp_1, npm_1, nvpg)
+    V = gapMatrix(nvp_1, npm_1, el_corr, nvpg)
     
-    return cusp.kron(H, V.transpose())
+    return (cusp.kron(H, V.transpose()), V, H)
