@@ -20,6 +20,7 @@ synthetic data.
   - **utils.py** - deconvolution utilites
 - **psf_experiments** - illustration/explanation of point spread behaviour
   - **4_psf_example.ipynb** - illustrates point spread application
+  - **4_psf_example_nonsq.ipynb** - illustrates point spread simulation with non-square detector
   - **4_psf_example_gaps.ipynb** - illustrates point spread application with detector gaps
 - **deconv_richard_lucy_experiments** - evaluation of richard lucy deconvolution
   - **1_comparison_areas.ipynb** - deconvolution/raw data comparison for a number of areas of interest
