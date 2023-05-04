@@ -13,13 +13,14 @@ synthetic data.
 # Project Structure
 
 - **lib** - common code throughout the project
-  - **xtrace.py** - estimation of spatially variant point spread function (and depth field estimates)
+  - **xtrace.py** - estimation of spatially variant point spread function (and depth field estimates) and construction of detector gap transformation matrix
   - **deconvolution.py** - deconvolution method implementations
   - **datagen.py** - utilities to generate synthetic data for training the deep learning models
   - **mlmodels.py** - keras network models
   - **utils.py** - deconvolution utilites
 - **psf_experiments** - illustration/explanation of point spread behaviour
   - **4_psf_example.ipynb** - illustrates point spread application
+  - **4_psf_example_gaps.ipynb** - illustrates point spread application with detector gaps
 - **deconv_richard_lucy_experiments** - evaluation of richard lucy deconvolution
   - **1_comparison_areas.ipynb** - deconvolution/raw data comparison for a number of areas of interest
   - **2_comparison_psf_methods.ipynb** - comparison of different deconvolution methods (local/updownsampled/normal)

@@ -29,7 +29,7 @@ from functools import reduce
 #
 
 def depth_spill_psf(config, xp, yp, energies=None, G=None):
-    nx, ny = config["dimensions"]
+    nx, ny = config["detector"]["nvirpix"]
     sx, sy, d = config["ray_origin"]
     px, py, pz = config["detector"]["pixel_dims"]
     mu = config["detector"]["mu"]
@@ -98,7 +98,7 @@ def depth_spill_psf(config, xp, yp, energies=None, G=None):
     
     return G
 
-def depth_offsets(config, xp, yp):
+def depth_offsets(config, xp, yp): #MAYBE I HAVE TO CHANGE THIS AS WELL :)
     nx, ny = config["dimensions"]
     sx, sy, d = config["ray_origin"]
     px, py, pz = config["detector"]["pixel_dims"]
@@ -124,3 +124,25 @@ def depth_offsets(config, xp, yp):
     yoffsets[original_cells[0],original_cells[1]] += offsets[1]
     
     return xoffsets.get(), yoffsets.get()
+
+def gaps_psf(config):
+    def gapMatrix(nvp, npm, el_corr, nvpg):
+        M = np.identity(nvp)
+        #identification of indexes that correspond to the firt el corr pixel in a gap
+        index = np.arange(npm, nvp, npm + nvpg) 
+        #set the content of those indexes to the electric correlation matrix
+        for i in index:
+            M[i: i + nvpg, i: i + nvpg] = cupy.asarray(el_corr)
+        return M
+         
+    nvp_0 = config["detector"]["nvirpix"][0]
+    npm_0 = config["detector"]["npixmod"][0]
+    el_corr = config["detector"]["el_corr"]
+    nvpg = np.shape(el_corr)[0]
+    H = gapMatrix(nvp_0, npm_0, el_corr, nvpg)
+    
+    nvp_1 = config["detector"]["nvirpix"][1]
+    npm_1 = config["detector"]["npixmod"][1]
+    V = gapMatrix(nvp_1, npm_1, el_corr, nvpg)
+    
+    return (cusp.kron(H, V.transpose()), V, H)

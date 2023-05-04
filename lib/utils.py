@@ -22,6 +22,16 @@ import copy
 import xtrace
 import deconvolution
 
+def nvirpix(config):
+    nmods_0 = config["detector"]["nmods"][0]
+    nmods_1 = config["detector"]["nmods"][1]
+    npixmod_0 = config["detector"]["npixmod"][0]
+    npixmod_1 = config["detector"]["npixmod"][1]
+    #It is supposed to be a squared matrix, any index should work
+    nvirpixgap = np.shape(config["detector"]["el_corr"])[0]
+    #I include the pixels that form the horizontal and vertical gaps
+    return np.array([(nmods_0 * npixmod_0) + ((nmods_0 - 1) * nvirpixgap), (nmods_1 * npixmod_1) + ((nmods_1 - 1) * nvirpixgap)])
+
 def mask(data, removehotspots=False):
     #Removing raw parts of image: 
     #-1 -> detector gaps, -2 -> hot pixels + extreme values
