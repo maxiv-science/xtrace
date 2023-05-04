@@ -29,7 +29,7 @@ from functools import reduce
 #
 
 def depth_spill_psf(config, xp, yp, energies=None, G=None):
-    nx, ny = config["detector"]["nvirpix"]
+    nx, ny = config["detector"]["nvirpix"] if "nvirpix" in config["detector"] else config["dimensions"]
     sx, sy, d = config["ray_origin"]
     px, py, pz = config["detector"]["pixel_dims"]
     mu = config["detector"]["mu"]
