@@ -30,7 +30,19 @@ def nvirpix(config):
     #It is supposed to be a squared matrix, any index should work
     nvirpixgap = np.shape(config["detector"]["el_corr"])[0]
     #I include the pixels that form the horizontal and vertical gaps
-    return np.array([(nmods_0 * npixmod_0) + ((nmods_0 - 1) * nvirpixgap), (nmods_1 * npixmod_1) + ((nmods_1 - 1) * nvirpixgap)])
+    return np.array([(nmods_0 * (npixmod_0-2) + 2 + (nmods_0 - 1) * nvirpixgap), (nmods_1 * (npixmod_1-2) + 2 + (nmods_1 - 1) * nvirpixgap)])
+
+def gaps_index(config):
+    """Returns start indexes of the gaps in each direction and the gaps width."""
+    nvp = nvirpix(config)
+    npm = config["detector"]["npixmod"]
+    nvpg = np.shape(config["detector"]["el_corr"])
+    idx_start = ()
+    idx_width = ()
+    for idim in range(len(nvp)):
+        idx_start += (np.arange(npm[idim]-1, nvp[idim]-1, npm[idim] + nvpg[idim] - 2),)
+        idx_width += (nvpg[idim]*np.ones_like(idx_start[-1]),)
+    return idx_start, idx_width
 
 def mask(data, removehotspots=False):
     #Removing raw parts of image: 

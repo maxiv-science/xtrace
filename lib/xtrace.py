@@ -129,9 +129,9 @@ def gaps_psf(config):
     def gapMatrix(nvp, npm, el_corr, nvpg):
         M = np.identity(nvp)
         #identification of indexes that correspond to the firt el corr pixel in a gap
-        index = np.arange(npm, nvp, npm + nvpg) 
+        index = np.arange(npm-1, nvp-1, npm + nvpg - 2)
         #set the content of those indexes to the electric correlation matrix
-        for i in index:
+        for i in index: # .tolist()
             M[i: i + nvpg, i: i + nvpg] = cupy.asarray(el_corr)
         return M
          
